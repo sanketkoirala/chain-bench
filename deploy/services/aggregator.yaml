@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregator
+  namespace: chainbench
+  labels:
+    app: chainbench
+    service: aggregator
+    chain-position: "7"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chainbench
+      service: aggregator
+  template:
+    metadata:
+      labels:
+        app: chainbench
+        service: aggregator
+        chain-position: "7"
+    spec:
+      containers:
+        - name: service
+          image: chainbench:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVICE_NAME
+              value: "aggregator"
+            - name: SERVICE_PORT
+              value: "8080"
+            - name: SERVICE_WORK_MS
+              value: "5"
+            - name: COLD_START_PROBABILITY
+              value: "0.1"
+            - name: COLD_START_MEDIAN_MS
+              value: "2100"
+            - name: COLD_START_SIGMA
+              value: "0.4"
+            - name: OTEL_EXPORTER_JAEGER_ENDPOINT
+              value: "jaeger-collector.chainbench.svc.cluster.local:4318"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregator
+  namespace: chainbench
+  labels:
+    app: chainbench
+    service: aggregator
+spec:
+  selector:
+    app: chainbench
+    service: aggregator
+  ports:
+    - port: 8080
+      targetPort: 8080
