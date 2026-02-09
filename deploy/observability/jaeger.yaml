@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: chainbench
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.52
+          ports:
+            - containerPort: 16686
+              name: ui
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+            - containerPort: 14250
+              name: model
+            - containerPort: 14268
+              name: thrift
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: MEMORY_MAX_TRACES
+              value: "100000"
+            - name: SPAN_STORAGE_TYPE
+              value: "memory"
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 14269
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: chainbench
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: thrift
+      port: 14268
+      targetPort: 14268
+    - name: model
+      port: 14250
+      targetPort: 14250
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: chainbench
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: 16686

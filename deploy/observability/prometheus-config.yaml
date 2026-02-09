@@ -1,0 +1,166 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: chainbench
+  labels:
+    app: prometheus
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+
+    rule_files:
+      - /etc/prometheus/recording-rules.yml
+
+    scrape_configs:
+      # ChainBench services
+      - job_name: chainbench-services
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - chainbench
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: chainbench
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_service]
+            target_label: service
+          - source_labels: [__meta_kubernetes_pod_label_chain_position]
+            target_label: chain_position
+        metrics_path: /metrics
+        # Target the app container port, not the Envoy sidecar
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: chainbench
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            regex: "8080"
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_service]
+            target_label: service
+          - source_labels: [__meta_kubernetes_pod_label_chain_position]
+            target_label: chain_position
+
+      # Static scrape targets as fallback (no service discovery needed)
+      - job_name: chainbench-static
+        static_configs:
+          - targets:
+              - gateway.chainbench.svc.cluster.local:8080
+            labels:
+              service: gateway
+              chain_position: "1"
+          - targets:
+              - auth.chainbench.svc.cluster.local:8080
+            labels:
+              service: auth
+              chain_position: "2"
+          - targets:
+              - userprofile.chainbench.svc.cluster.local:8080
+            labels:
+              service: userprofile
+              chain_position: "3"
+          - targets:
+              - recommend.chainbench.svc.cluster.local:8080
+            labels:
+              service: recommend
+              chain_position: "4"
+          - targets:
+              - inventory.chainbench.svc.cluster.local:8080
+            labels:
+              service: inventory
+              chain_position: "5"
+          - targets:
+              - pricing.chainbench.svc.cluster.local:8080
+            labels:
+              service: pricing
+              chain_position: "6"
+          - targets:
+              - aggregator.chainbench.svc.cluster.local:8080
+            labels:
+              service: aggregator
+              chain_position: "7"
+
+      # Istio control plane
+      - job_name: istio-mesh
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - istio-system
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: istiod;http-monitoring
+
+      # Envoy sidecar metrics via Istio annotations
+      - job_name: envoy-stats
+        metrics_path: /stats/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - chainbench
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: keep
+            regex: istio-proxy
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: drop
+            regex: "false"
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:15090
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_service]
+            target_label: service
+
+  recording-rules.yml: |
+    groups:
+      - name: chainbench_latency
+        interval: 5s
+        rules:
+          # p99 request duration per service over 1m window
+          - record: chainbench:request_duration:p99
+            expr: |
+              histogram_quantile(0.99,
+                sum(rate(request_duration_seconds_bucket{job=~"chainbench.*"}[1m])) by (le, service)
+              )
+
+          # p99.9 request duration per service over 1m window
+          - record: chainbench:request_duration:p999
+            expr: |
+              histogram_quantile(0.999,
+                sum(rate(request_duration_seconds_bucket{job=~"chainbench.*"}[1m])) by (le, service)
+              )
+
+          # p50 request duration per service over 1m window
+          - record: chainbench:request_duration:p50
+            expr: |
+              histogram_quantile(0.50,
+                sum(rate(request_duration_seconds_bucket{job=~"chainbench.*"}[1m])) by (le, service)
+              )
+
+          # Cold-start rate: cold starts / total requests per service over 1m
+          - record: chainbench:cold_start_rate
+            expr: |
+              sum(rate(cold_start_total{job=~"chainbench.*"}[1m])) by (service)
+              /
+              sum(rate(request_total{job=~"chainbench.*"}[1m])) by (service)
+
+          # Amplification factor: p99 of each service / p99 of aggregator (baseline terminal node)
+          - record: chainbench:amplification_p99
+            expr: |
+              chainbench:request_duration:p99
+              /
+              ignoring(service) group_left
+              chainbench:request_duration:p99{service="aggregator"}

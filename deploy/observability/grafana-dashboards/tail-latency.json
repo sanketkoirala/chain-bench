@@ -1,0 +1,291 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 200,
+      "title": "End-to-End Latency Distribution",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "latency",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99.9" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineWidth", "value": 3 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 1 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le))",
+          "legendFormat": "p90",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le))",
+          "legendFormat": "p95",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le))",
+          "legendFormat": "p99",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.999, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le))",
+          "legendFormat": "p99.9",
+          "refId": "E"
+        }
+      ],
+      "title": "Gateway End-to-End Latency (p50 / p90 / p95 / p99 / p99.9)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 201,
+      "title": "Amplification Factor",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "amplification (x)",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "x",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le)) / $baseline_p99",
+          "legendFormat": "gateway p99 / baseline",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.999, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le)) / $baseline_p99",
+          "legendFormat": "gateway p99.9 / baseline",
+          "refId": "B"
+        }
+      ],
+      "title": "Amplification Factor (vs. Baseline p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "amplification (x)",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          },
+          "unit": "x",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "chainbench:amplification_p99",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Service p99 Amplification (vs. Aggregator)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 202,
+      "title": "Per-Service Latency Breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisLabel": "latency",
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 21 },
+      "id": 13,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"aggregator\"}[$interval])) by (le))",
+          "legendFormat": "aggregator (pos 7)",
+          "refId": "G"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"pricing\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"aggregator\"}[$interval])) by (le))",
+          "legendFormat": "pricing (pos 6)",
+          "refId": "F"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"inventory\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"pricing\"}[$interval])) by (le))",
+          "legendFormat": "inventory (pos 5)",
+          "refId": "E"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"recommend\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"inventory\"}[$interval])) by (le))",
+          "legendFormat": "recommend (pos 4)",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"userprofile\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"recommend\"}[$interval])) by (le))",
+          "legendFormat": "userprofile (pos 3)",
+          "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"auth\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"userprofile\"}[$interval])) by (le))",
+          "legendFormat": "auth (pos 2)",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"gateway\"}[$interval])) by (le)) - histogram_quantile(0.99, sum(rate(request_duration_seconds_bucket{job=~\"chainbench.*\", service=\"auth\"}[$interval])) by (le))",
+          "legendFormat": "gateway (pos 1)",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Service Latency Contribution to End-to-End p99 (Stacked)",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 38,
+  "tags": ["chainbench", "tail-latency", "amplification"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "chainbench", "value": "chainbench" },
+        "hide": 0,
+        "label": "Namespace",
+        "name": "namespace",
+        "options": [
+          { "selected": true, "text": "chainbench", "value": "chainbench" }
+        ],
+        "query": "chainbench",
+        "type": "textbox"
+      },
+      {
+        "current": { "selected": false, "text": "1m", "value": "1m" },
+        "hide": 0,
+        "label": "Interval",
+        "name": "interval",
+        "options": [
+          { "selected": false, "text": "30s", "value": "30s" },
+          { "selected": true, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "5m", "value": "5m" }
+        ],
+        "query": "30s,1m,5m",
+        "type": "custom"
+      },
+      {
+        "current": { "selected": false, "text": "0.035", "value": "0.035" },
+        "hide": 0,
+        "label": "Baseline p99 (seconds)",
+        "name": "baseline_p99",
+        "query": "0.035",
+        "type": "textbox"
+      },
+      {
+        "hide": 2,
+        "label": "Prometheus",
+        "name": "DS_PROMETHEUS",
+        "query": "prometheus",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ChainBench Tail Latency Analysis",
+  "uid": "chainbench-tail-latency",
+  "version": 1
+}
